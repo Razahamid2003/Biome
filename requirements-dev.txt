@@ -1,0 +1,8 @@
+great-expectations==0.18.21
+pandas>=1.5
+pre-commit==3.7.0
+black==24.4.2
+isort==5.13.2
+flake8==6.1.0
+mypy==1.8.0
+types-PyYAML

@@ -1,0 +1,38 @@
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+extend-exclude = """
+(
+  ^gx/data_docs/
+| ^gx/uncommitted/
+| ^.venv/
+| ^venv/
+| __pycache__/
+)
+"""
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = ["gx/data_docs", "gx/uncommitted", ".venv", "venv"]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
+exclude = [
+  "gx/data_docs",
+  "gx/uncommitted",
+  ".venv",
+  "venv",
+  "__pycache__",
+]
+per-file-ignores = [
+  "__init__.py:F401"
+]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true
+exclude = "(gx/data_docs|gx/uncommitted|build|dist|.venv|venv)"

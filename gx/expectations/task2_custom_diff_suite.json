@@ -1,0 +1,25 @@
+{
+  "data_asset_type": null,
+  "expectation_suite_name": "task2_custom_diff_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_column_pair_values_diff_within_range",
+      "kwargs": {
+        "column_A": "Value_A",
+        "column_B": "Value_B",
+        "ignore_row_if": "both_values_are_missing",
+        "include_unexpected_rows": true,
+        "max_threshold": 10,
+        "min_threshold": 0,
+        "mostly": 0.8,
+        "sort": true,
+        "sort_key": "Value_A"
+      },
+      "meta": {}
+    }
+  ],
+  "ge_cloud_id": null,
+  "meta": {
+    "great_expectations_version": "0.18.21"
+  }
+}
