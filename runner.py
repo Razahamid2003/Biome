@@ -11,14 +11,15 @@ Great Expectations version: 0.18.21
 
 from __future__ import annotations
 
+from importlib.abc import Loader
+from importlib.machinery import ModuleSpec
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, NoReturn, Optional, cast
 
-import pandas as pd
 import great_expectations as gx
+import pandas as pd
 from great_expectations.checkpoint import SimpleCheckpoint
-
 
 # ---------------- USER CONFIG ----------------
 CSV_FILENAME = "Task.csv"
@@ -38,8 +39,8 @@ RUNTIME_RESULT_FORMAT: Dict[str, Any] = {
 # ------------------------------------------------
 
 
-def _die(msg: str) -> None:
-    """Exit the program with an error message."""
+def _die(msg: str) -> NoReturn:
+    """Exit the program with an error message (never returns)."""
     print(f"ERROR: {msg}")
     raise SystemExit(1)
 
@@ -49,9 +50,8 @@ def _load_csv(csv_path: Path) -> pd.DataFrame:
         _die(f"CSV not found at: {csv_path}")
     try:
         return pd.read_csv(csv_path)
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover
         _die(f"Failed to read CSV: {exc}")
-    return pd.DataFrame()
 
 
 def _import_plugin_by_path(plugin_path: Path) -> None:
@@ -62,11 +62,17 @@ def _import_plugin_by_path(plugin_path: Path) -> None:
             f"Expected here:\n  {plugin_path}\n"
             "Move your file to this path and re-run."
         )
-    spec = spec_from_file_location("expect_column_pair_values_diff_within_range", str(plugin_path))
+    spec = spec_from_file_location(
+        "expect_column_pair_values_diff_within_range",
+        str(plugin_path),
+    )
     if spec is None or spec.loader is None:
         _die("Failed to load plugin spec.")
-    module = module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # Help mypy: spec is guaranteed not None beyond this point.
+    spec_typed = cast(ModuleSpec, spec)
+    loader = cast(Loader, spec_typed.loader)
+    module = module_from_spec(spec_typed)
+    loader.exec_module(module)
 
 
 def _validate_user_inputs(df: pd.DataFrame) -> None:
@@ -101,8 +107,11 @@ def main() -> None:
     print("GX Context root:", context.root_directory)
 
     # ---------- Load the plugin by file path ----------
-    plugin_path = Path(context.root_directory) / "plugins" / "expectations" / (
-        "expect_column_pair_values_diff_within_range.py"
+    plugin_path = (
+        Path(context.root_directory)
+        / "plugins"
+        / "expectations"
+        / "expect_column_pair_values_diff_within_range.py"
     )
     _import_plugin_by_path(plugin_path)
 
@@ -163,7 +172,7 @@ def main() -> None:
     try:
         context.open_data_docs()
         print("Opened Data Docs.")
-    except Exception as ex:
+    except Exception as ex:  # pragma: no cover
         print("Data Docs could not be opened automatically:", ex)
         print("Open the site from:", Path(context.root_directory) / "data_docs")
 

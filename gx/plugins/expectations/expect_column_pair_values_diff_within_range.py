@@ -31,7 +31,7 @@ class ColumnPairValuesDiffWithinRange(ColumnPairMapMetricProvider):
     condition_value_keys = ("min_threshold", "max_threshold", "sort", "sort_key", "ignore_row_if")
 
     @column_pair_condition_partial(engine=PandasExecutionEngine)
-    def _pandas(  # type: ignore[override]
+    def _pandas(
         cls,
         column_A: pd.Series,
         column_B: pd.Series,
@@ -118,7 +118,6 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
         "contributors": ["@hatchi.08251973"],
     }
 
-    # Minimal gallery examples (kept compact for CI/lint)
     examples: List[Dict[str, Any]] = [
         {
             "data": {
@@ -163,7 +162,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
         config = configuration or self.configuration
         if config is None:
             raise InvalidExpectationConfigurationError("No configuration provided.")
-        kwargs: Dict[str, Any] = dict(config.kwargs or {})
+        kwargs: Dict[str, Any] = dict(getattr(config, "kwargs", {}) or {})
 
         for key in ("column_A", "column_B"):
             if key not in kwargs or not isinstance(kwargs[key], str) or not kwargs[key]:
@@ -194,7 +193,9 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
                     "When sort=True, sort_key must be a non-empty string."
                 )
             if sort_key not in (kwargs["column_A"], kwargs["column_B"]):
-                raise InvalidExpectationConfigurationError("sort_key must equal column_A or column_B.")
+                raise InvalidExpectationConfigurationError(
+                    "sort_key must equal column_A or column_B."
+                )
 
         ignore_row_if = kwargs.get("ignore_row_if", "both_values_are_missing")
         allowed = {"both_values_are_missing", "either_value_is_missing", "neither"}
@@ -206,7 +207,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
         return True
 
     # ---- Enrich EVR with ALL rows (ad-hoc validator path) ----
-    def validate(  # type: ignore[override]
+    def validate(
         self,
         validator: Any,
         configuration: Optional[dict] = None,
@@ -222,8 +223,9 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
         )
         try:
             cfg = configuration or self.configuration
-            assert cfg is not None
-            params = dict(cfg.kwargs or {})
+            if cfg is None:
+                return evr
+            params: Dict[str, Any] = dict(getattr(cfg, "kwargs", {}) or {})
 
             col_A: str = params["column_A"]
             col_B: str = params["column_B"]
@@ -233,7 +235,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
             sort_key = params.get("sort_key")
             ignore_row_if = params.get("ignore_row_if", "both_values_are_missing")
 
-            df_all: pd.DataFrame = validator.active_batch.data.dataframe  # type: ignore[assignment]
+            df_all: pd.DataFrame = validator.active_batch.data.dataframe
             df = df_all[[col_A, col_B]].copy()
             if sort_flag:
                 df = df.sort_values(by=sort_key)
@@ -278,7 +280,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
         return evr
 
     # ---- Enrich EVR with ALL rows (checkpoint/graph path) ----
-    def _validate(  # type: ignore[override]
+    def _validate(
         self,
         configuration: dict,
         metrics: Dict[str, Any],
@@ -293,7 +295,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
             execution_engine,
         )
         try:
-            params = dict(configuration.get("kwargs") or {})
+            params: Dict[str, Any] = dict(configuration.get("kwargs") or {})
             col_A: str = params["column_A"]
             col_B: str = params["column_B"]
             min_th = params.get("min_threshold")
@@ -305,7 +307,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
             if not isinstance(execution_engine, PandasExecutionEngine):
                 return res
 
-            df: pd.DataFrame = execution_engine.get_domain_records(  # type: ignore[assignment]
+            df: pd.DataFrame = execution_engine.get_domain_records(
                 domain_kwargs={"column_A": col_A, "column_B": col_B}
             )
             df = df[[col_A, col_B]].copy()
@@ -352,7 +354,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
     # --- Prescriptive text ---
     @classmethod
     @renderer(renderer_type="renderer.prescriptive")
-    def _prescriptive_renderer(  # type: ignore[override]
+    def _prescriptive_renderer(
         cls,
         configuration: Optional[dict] = None,
         result: Optional[dict] = None,
@@ -360,7 +362,8 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
     ) -> List[RenderedStringTemplateContent]:
         """Human-readable statement describing the expectation."""
         cfg = configuration or (result and result.get("expectation_config")) or {}
-        params = (cfg.get("kwargs") or {})
+        params: Dict[str, Any] = (cfg.get("kwargs") or {}) if isinstance(cfg, dict) else {}
+        # If cfg is an ExpectationConfiguration, Data Docs will call this renderer with dicts.
         col_a = params.get("column_A", "column_A")
         col_b = params.get("column_B", "column_B")
         min_t = params.get("min_threshold")
@@ -382,7 +385,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
     # --- Diagnostic table: ONLY failures; red text via inline HTML (no background) ---
     @classmethod
     @renderer(renderer_type="renderer.diagnostic.unexpected_table")
-    def _unexpected_table_renderer(  # type: ignore[override]
+    def _unexpected_table_renderer(
         cls,
         result: Optional[dict] = None,
         **kwargs: Any,
@@ -396,19 +399,21 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
         idx_list = res.get("unexpected_index_list")  # may be None if not COMPLETE format
 
         cfg = result.get("expectation_config") or {}
-        params = (cfg.get("kwargs") or {})
+        params: Dict[str, Any] = (cfg.get("kwargs") or {}) if isinstance(cfg, dict) else {}
         col_a = params.get("column_A", "column_A")
         col_b = params.get("column_B", "column_B")
 
         if not unexpected:
-            return [RenderedStringTemplateContent(string_template={"template": "No unexpected rows."})]
+            return [
+                RenderedStringTemplateContent(string_template={"template": "No unexpected rows."})
+            ]
 
         def fail_html(value: Any) -> str:
             """Inline HTML for red text only; avoids backgrounds/scrollbars in Data Docs."""
             txt = "—" if value is None else str(value)
             return (
                 '<span style="color:#B3261E; font-weight:600; '
-                'background:none; padding:0; border:none; border-radius:0; '
+                "background:none; padding:0; border:none; border-radius:0; "
                 'white-space:nowrap; overflow:visible; display:inline; box-shadow:none;">'
                 f"{txt}</span>"
             )
@@ -422,13 +427,23 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
 
             row_cells: List[RenderedStringTemplateContent] = []
             if idx_list is not None:
-                row_cells.append(RenderedStringTemplateContent(string_template={"template": fail_html(idx_list[i])}))
-            row_cells.append(RenderedStringTemplateContent(string_template={"template": fail_html(a)}))
-            row_cells.append(RenderedStringTemplateContent(string_template={"template": fail_html(b)}))
+                row_cells.append(
+                    RenderedStringTemplateContent(
+                        string_template={"template": fail_html(idx_list[i])}
+                    )
+                )
+            row_cells.append(
+                RenderedStringTemplateContent(string_template={"template": fail_html(a)})
+            )
+            row_cells.append(
+                RenderedStringTemplateContent(string_template={"template": fail_html(b)})
+            )
             table.append(row_cells)
 
         header = RenderedStringTemplateContent(
-            string_template={"template": f"Failed rows for {col_a} vs {col_b} (only unexpected shown)"}
+            string_template={
+                "template": f"Failed rows for {col_a} vs {col_b} (only unexpected shown)"
+            }
         )
 
         return [
