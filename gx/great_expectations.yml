@@ -41,11 +41,11 @@ data_docs_sites:
     site_index_builder:
       class_name: DefaultSiteIndexBuilder
 anonymous_usage_statistics:
-  enabled: true
   data_context_id: 0ded1f4d-dc8b-4e72-8993-60bcc8d0b3e2
+  enabled: true
 include_rendered_content:
-  expectation_suite: false
   globally: false
+  expectation_suite: false
   expectation_validation_result: false
 notebooks:
 fluent_datasources:

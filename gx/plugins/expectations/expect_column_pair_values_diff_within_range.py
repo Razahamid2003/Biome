@@ -163,7 +163,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
 
         return True
 
-    # ---- Prescriptive text (natural language) ----
+    # ---- Prescriptive text ----
     @classmethod
     @renderer(renderer_type="renderer.prescriptive")
     def _prescriptive_renderer(
@@ -222,7 +222,7 @@ class ExpectColumnPairValuesDiffWithinRange(ColumnPairMapExpectation):
 
         return [RenderedStringTemplateContent(string_template={"template": text})]
 
-    # ---- Diagnostic table: only failures (red), centered headers ----
+    # ---- Diagnostic table ----
     @classmethod
     @renderer(renderer_type="renderer.diagnostic.unexpected_table")
     def _unexpected_table_renderer(
