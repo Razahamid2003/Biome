@@ -1,0 +1,9 @@
+{
+  "min_threshold": null,
+  "max_threshold": 10,
+  "sort": true,
+  "sort_key": null,
+  "ignore_row_if": "both_values_are_missing",
+  "mostly": 0.8,
+  "suite_name": "task2_custom_diff_suite"
+}

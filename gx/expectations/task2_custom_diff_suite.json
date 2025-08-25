@@ -10,7 +10,7 @@
         "ignore_row_if": "both_values_are_missing",
         "include_unexpected_rows": true,
         "max_threshold": 10,
-        "min_threshold": 0,
+        "min_threshold": null,
         "mostly": 0.8,
         "sort": true,
         "sort_key": "Value_A"
