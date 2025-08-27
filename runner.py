@@ -7,7 +7,7 @@ from importlib.abc import Loader
 from importlib.machinery import ModuleSpec
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from typing import Any, Dict, NoReturn, Tuple, cast
+from typing import Any, Dict, List, NoReturn, Tuple, cast
 
 import great_expectations as gx
 import pandas as pd
@@ -27,11 +27,27 @@ def _die(msg: str) -> NoReturn:
     raise SystemExit(1)
 
 
+def _looks_like_numeric_header(cols: List[Any]) -> bool:
+    """Heuristic: header row seems numeric (typical when CSV has no header)."""
+    if not cols:
+        return False
+    try:
+        return all(str(c).strip() != "" and float(str(c).strip()) is not None for c in cols)
+    except Exception:
+        return False
+
+
 def _load_csv(csv_path: Path) -> pd.DataFrame:
     if not csv_path.is_file():
         _die(f"CSV not found at: {csv_path}")
     try:
-        return pd.read_csv(csv_path)
+        # First attempt: assume header row exists
+        df = pd.read_csv(csv_path, skipinitialspace=True)
+        # If the inferred header looks numeric, re-read as headerless and name columns
+        if _looks_like_numeric_header(list(df.columns)):
+            df = pd.read_csv(csv_path, header=None, skipinitialspace=True)
+            df.columns = [f"column_{i+1}" for i in range(df.shape[1])]
+        return df
     except Exception as exc:
         _die(f"Failed to read CSV: {exc}")
 
@@ -47,7 +63,7 @@ def _load_config(config_path: Path) -> Dict[str, Any]:
     min_th = cfg.get("min_threshold")
     max_th = cfg.get("max_threshold")
     if min_th is None and max_th is None:
-        _die("Provide at least one of 'min_threshold' or 'max_threshold' " "in JSON.")
+        _die("Provide at least one of 'min_threshold' or 'max_threshold' in JSON.")
     if min_th is not None and not isinstance(min_th, (int, float)):
         _die("'min_threshold' must be numeric or null.")
     if max_th is not None and not isinstance(max_th, (int, float)):
@@ -59,11 +75,7 @@ def _load_config(config_path: Path) -> Dict[str, Any]:
     sort_key = cfg.get("sort_key")
 
     ignore_row_if = cfg.get("ignore_row_if", "both_values_are_missing")
-    allowed = {
-        "both_values_are_missing",
-        "either_value_is_missing",
-        "neither",
-    }
+    allowed = {"both_values_are_missing", "either_value_is_missing", "neither"}
     if ignore_row_if not in allowed:
         _die(
             "'ignore_row_if' must be one of: "
@@ -78,8 +90,8 @@ def _load_config(config_path: Path) -> Dict[str, Any]:
     if not isinstance(suite_name, str) or not suite_name:
         _die("'suite_name' must be a non-empty string.")
 
-    col_a = cfg.get("column_A")
-    col_b = cfg.get("column_B")
+    col_a = cfg.get("column_A")  # optional
+    col_b = cfg.get("column_B")  # optional
     if col_a is not None and (not isinstance(col_a, str) or not col_a):
         _die("'column_A' must be a non-empty string if provided.")
     if col_b is not None and (not isinstance(col_b, str) or not col_b):
@@ -99,17 +111,22 @@ def _load_config(config_path: Path) -> Dict[str, Any]:
 
 
 def _resolve_columns(df: pd.DataFrame, cfg: Dict[str, Any]) -> Tuple[str, str]:
+    """Return (col_A, col_B) with fallbacks for missing names."""
     ca = cfg.get("column_A")
     cb = cfg.get("column_B")
+
     if isinstance(ca, str) and isinstance(cb, str):
         missing = [c for c in (ca, cb) if c not in df.columns]
-        if missing:
-            _die(f"Configured columns not found in CSV: {missing}")
-        return ca, cb
+        if not missing:
+            return ca, cb
+        print(
+            f"Warning: configured columns not found {missing}; "
+            "falling back to auto-select numeric columns."
+        )
 
     numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
     if len(numeric_cols) >= 2:
-        a, b = numeric_cols[0], numeric_cols[1]
+        a, b = str(numeric_cols[0]), str(numeric_cols[1])
         print(f"Auto-selected numeric columns: {a}, {b}")
         return a, b
 
@@ -145,11 +162,12 @@ def main() -> None:
     col_a, col_b = _resolve_columns(df, cfg)
 
     if cfg["sort"]:
-        if cfg["sort_key"] is None:
+        if cfg["sort_key"] not in (col_a, col_b):
+            print(
+                "Warning: 'sort' is true but 'sort_key' is missing or doesn't match "
+                f"resolved columns ({col_a}, {col_b}). Defaulting sort_key to '{col_a}'."
+            )
             cfg["sort_key"] = col_a
-            print(f"sort_key not provided. Defaulting to '{col_a}'.")
-        elif cfg["sort_key"] not in (col_a, col_b):
-            _die("When 'sort' is true, 'sort_key' must match " "column_A or column_B.")
 
     context: Any = gx.get_context()
     plugin_path = (
@@ -164,7 +182,7 @@ def main() -> None:
     validator = datasource.read_dataframe(df, asset_name="task_asset")
 
     if not hasattr(validator, "expect_column_pair_values_diff_within_range"):
-        _die("Custom expectation not registered on Validator. " "Check the plugin file and re-run.")
+        _die("Custom expectation not registered on Validator. Check the plugin file and re-run.")
 
     print(
         f"Validating: abs({col_a} - {col_b}) within "

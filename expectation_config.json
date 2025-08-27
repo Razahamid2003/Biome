@@ -1,9 +1,11 @@
 {
-  "min_threshold": null,
+  "column_A": "Value_A",
+  "column_B": "Value_B",
+  "min_threshold": 0,
   "max_threshold": 10,
   "sort": true,
-  "sort_key": null,
+  "sort_key": "Value_A",
   "ignore_row_if": "both_values_are_missing",
   "mostly": 0.8,
-  "suite_name": "task2_custom_diff_suite"
+  "suite_name": "task_custom_diff_suite"
 }
